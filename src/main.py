@@ -71,6 +71,37 @@ PRODUCT DATA:
     validated_output = InstagramCaptionSchema(**mock_output)
     execution_time = round(time.time() - start_time, 2)
 
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO ai_logs (
+            brand_id,
+            prompt_id,
+            raw_input_data,
+            final_prompt_sent,
+            raw_output_received,
+            model_used,
+            execution_time_seconds
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s);
+        """,
+        (
+            brand_id,
+            prompt_id,
+            json.dumps(product_data),
+            runtime_prompt,
+            json.dumps(validated_output.model_dump()),
+            "mock-runtime",
+            execution_time
+        )
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
     print("\n✅ Runtime dinámico + validación Pydantic OK")
     print(f"\nBrand: {brand_name}")
     print(f"Prompt: {prompt_name} {version}")
