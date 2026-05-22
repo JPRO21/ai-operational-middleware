@@ -10,7 +10,31 @@ from config.database import get_db_connection
 from src.validators import InstagramCaptionSchema
 
 
-FORCE_INVALID_OUTPUT = False  # Cambia a True para probar validación de output inválido
+FORCE_INVALID_OUTPUT = False
+
+
+def sanitize_input(raw_input: str, max_length: int = 500) -> str:
+    text = raw_input[:max_length]
+
+    injection_patterns = [
+        "ignore",
+        "ignora",
+        "forget",
+        "olvida",
+        "system prompt",
+        "instrucciones anteriores",
+        "previous instructions",
+        "disregard",
+        "override",
+    ]
+
+    text_lower = text.lower()
+
+    for pattern in injection_patterns:
+        if pattern in text_lower:
+            raise ValueError(f"Input rechazado: patrón sospechoso '{pattern}'")
+
+    return text
 
 
 def load_runtime_context(brand_id: int):
@@ -126,7 +150,7 @@ def calculate_cost(model_name: str, input_tokens: int, output_tokens: int) -> fl
 
     cur.execute(
         """
-        SELECT input_cost_per_1k, output_cost_per_1k
+        SELECT input_price_per_1k, output_price_per_1k
         FROM api_pricing
         WHERE model_name = %s
         ORDER BY id DESC
@@ -143,12 +167,9 @@ def calculate_cost(model_name: str, input_tokens: int, output_tokens: int) -> fl
     if not pricing:
         raise ValueError(f"No pricing found for model: {model_name}")
 
-    input_cost_per_1k, output_cost_per_1k = pricing
+    input_price_per_1k, output_price_per_1k = pricing
 
-    cost = (
-        (input_tokens / 1000) * float(input_cost_per_1k)
-        + (output_tokens / 1000) * float(output_cost_per_1k)
-    )
+    cost = (input_tokens / 1000) * float(input_price_per_1k) + (output_tokens / 1000) * float(output_price_per_1k)
 
     return round(cost, 6)
 
@@ -170,10 +191,37 @@ def run_dynamic_runtime(brand_id: int):
 
     daily_budget_usd = float(brand_config.get("daily_budget_usd", 1.0))
 
-    product_data = {
+    raw_product_data = {
         "name": "Ficus Lyrata",
         "details": "Hojas grandes premium."
     }
+
+    try:
+        product_data = {
+            "name": sanitize_input(raw_product_data["name"]),
+            "details": sanitize_input(raw_product_data["details"])
+        }
+
+    except ValueError as error:
+        execution_time = round(time.time() - start_time, 2)
+
+        log_security_event(
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            product_data=raw_product_data,
+            runtime_prompt="",
+            raw_output_received={
+                "error": "injection_attempt",
+                "message": str(error)
+            },
+            model_used="input_sanitizer",
+            execution_time=execution_time,
+            security_flag="injection_attempt"
+        )
+
+        print("\n🛑 Input Sanitizer detenido")
+        print(str(error))
+        return
 
     runtime_prompt = f"""
 SYSTEM INSTRUCTION:
@@ -307,7 +355,7 @@ PRODUCT DATA:
     cur.close()
     conn.close()
 
-    print("\n✅ Runtime + Security Flag Layer OK")
+    print("\n✅ Runtime + Sanitizer + Security Flag Layer OK")
 
     print(f"\nBrand: {brand_name}")
     print(f"Prompt: {prompt_name} {version}")
