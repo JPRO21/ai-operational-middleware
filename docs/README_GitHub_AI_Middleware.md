@@ -59,7 +59,7 @@ Delivery Layer (n8n · Google Drive · Notion)
 | Core Backend | Python 3.11+ |
 | Database | PostgreSQL + pgAdmin |
 | Prompt Ops | PromptOps versionado + JSONB |
-| AI Providers | OpenAI SDK|
+| AI Providers | OpenAI SDK · Claude API |
 | Trigger / Delivery | n8n |
 | Validation | Pydantic |
 | Storage de outputs | Google Drive · Notion |
