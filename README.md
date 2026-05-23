@@ -1,4 +1,5 @@
 # AI Operational Middleware
+![AI Operational Middleware Architecture](docs/architecture-diagram.png)
 
 > Sistema operacional AI-native para automatizar generación de contenido y operaciones de marketing en negocios pequeños.
 
