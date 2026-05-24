@@ -3,6 +3,11 @@
 
 > Sistema operacional AI-native para automatizar generación de contenido y operaciones de marketing en negocios pequeños.
 
+## Author
+
+Juan Pablo Rodríguez Salas  
+LinkedIn: https://linkedin.com/in/jprodriguezs
+
 ## ¿Qué es esto?
 
 Un middleware propio construido en Python que conecta IA generativa con operaciones de negocio reales. No es un wrapper de ChatGPT. Es infraestructura operacional con contexto persistente de marca, orquestación de runtime y observabilidad completa.
