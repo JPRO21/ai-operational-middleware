@@ -6,7 +6,7 @@
 ## Author
 
 Juan Pablo Rodríguez Salas  
-LinkedIn: https://linkedin.com/in/jprodriguezs
+LinkedIn: https://www.linkedin.com/in/juanpablorodriguezs/
 
 ## ¿Qué es esto?
 
