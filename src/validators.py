@@ -1,8 +1,11 @@
-from pydantic import BaseModel, Field
 from typing import List
 
+from pydantic import BaseModel
+
+
 class InstagramCaptionSchema(BaseModel):
-    caption: str = Field(description="El texto principal del post.")
-    hashtags: List[str] = Field(description="Lista de hashtags optimizados.")
-    cta: str = Field(description="Llamado a la acción explícito.")
-    platform: str = Field(default="instagram")
+    caption: str
+    hashtags: List[str]
+    cta: str
+    platform: str
+    tone_check: str

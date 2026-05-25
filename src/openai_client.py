@@ -11,15 +11,21 @@ MODEL_NAME = "gpt-4.1-mini"
 
 
 def generate_openai_response(runtime_prompt: str, use_real_api: bool = False) -> dict:
+
     if not use_real_api:
         print("🧪 Provider Layer usará mock. No se llama a OpenAI.")
 
         return {
             "output": {
                 "caption": "Transforma tu espacio con una planta llena de vida y presencia natural.",
-                "hashtags": ["#PlantasDeInterior", "#PlantasMagicas", "#DecoracionNatural"],
+                "hashtags": [
+                    "#PlantasDeInterior",
+                    "#PlantasMagicas",
+                    "#DecoracionNatural"
+                ],
                 "cta": "Escríbenos para reservar la tuya.",
-                "platform": "instagram"
+                "platform": "instagram",
+                "tone_check": "Alineado con tono orgánico y emocional."
             },
             "usage": {
                 "input_tokens": 0,
@@ -58,19 +64,31 @@ def generate_openai_response(runtime_prompt: str, use_real_api: bool = False) ->
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "caption": {"type": "string"},
+                        "caption": {
+                            "type": "string"
+                        },
                         "hashtags": {
                             "type": "array",
-                            "items": {"type": "string"}
+                            "items": {
+                                "type": "string"
+                            }
                         },
-                        "cta": {"type": "string"},
-                        "platform": {"type": "string"}
+                        "cta": {
+                            "type": "string"
+                        },
+                        "platform": {
+                            "type": "string"
+                        },
+                        "tone_check": {
+                            "type": "string"
+                        }
                     },
                     "required": [
                         "caption",
                         "hashtags",
                         "cta",
-                        "platform"
+                        "platform",
+                        "tone_check"
                     ]
                 }
             }
