@@ -12,7 +12,6 @@ from src.database_runtime import (
     check_daily_budget,
     calculate_cost,
 )
-
 from src.openai_client import generate_openai_response
 from src.security import sanitize_input
 from src.validators import InstagramCaptionSchema
@@ -21,59 +20,26 @@ from src.validators import InstagramCaptionSchema
 FORCE_INVALID_OUTPUT = False
 
 
-def run_dynamic_runtime(brand_id: int):
-
-    start_time = time.time()
-
-    brand, prompt = load_runtime_context(brand_id)
-
-    if not brand:
-        raise ValueError(f"No existe brand_id={brand_id}")
-
-    if not prompt:
-        raise ValueError("No hay prompt activo")
-
-    brand_id, brand_name, brand_config = brand
-    prompt_id, prompt_name, version, system_instruction = prompt
-
-    daily_budget_usd = float(
-        brand_config.get("daily_budget_usd", 1.0)
-    )
-
-    raw_product_data = {
+def get_sample_product_data() -> dict:
+    return {
         "name": "Ficus Lyrata",
         "details": "Hojas grandes premium.",
     }
 
-    try:
-        product_data = {
-            "name": sanitize_input(raw_product_data["name"]),
-            "details": sanitize_input(raw_product_data["details"]),
-        }
 
-    except ValueError as error:
+def sanitize_product_data(raw_product_data: dict) -> dict:
+    return {
+        "name": sanitize_input(raw_product_data["name"]),
+        "details": sanitize_input(raw_product_data["details"]),
+    }
 
-        execution_time = round(time.time() - start_time, 2)
 
-        log_security_event(
-            brand_id=brand_id,
-            prompt_id=prompt_id,
-            product_data=raw_product_data,
-            runtime_prompt="",
-            raw_output_received={
-                "error": "injection_attempt",
-                "message": str(error),
-            },
-            model_used="input_sanitizer",
-            execution_time=execution_time,
-            security_flag="injection_attempt",
-        )
-
-        print("\n🛑 Input Sanitizer detenido")
-        print(str(error))
-        return
-
-    runtime_prompt = f"""
+def assemble_runtime_prompt(
+    system_instruction: str,
+    brand_config: dict,
+    product_data: dict,
+) -> str:
+    return f"""
 SYSTEM INSTRUCTION:
 {system_instruction}
 
@@ -84,95 +50,50 @@ PRODUCT DATA:
 {json.dumps(product_data, ensure_ascii=False, indent=2)}
 """
 
-    try:
 
-        if not DEVELOPMENT_MODE:
-            check_daily_budget(
-                brand_id=brand_id,
-                daily_limit=daily_budget_usd,
-            )
-
-    except RuntimeError as error:
-
-        execution_time = round(time.time() - start_time, 2)
-
-        log_security_event(
-            brand_id=brand_id,
-            prompt_id=prompt_id,
-            product_data=product_data,
-            runtime_prompt=runtime_prompt,
-            raw_output_received={
-                "error": "budget_exceeded",
-                "message": (
-                    "Execution stopped by budget "
-                    "guard before provider call."
-                ),
-            },
-            model_used="budget_guard",
-            execution_time=execution_time,
-            security_flag="budget_exceeded",
-        )
-
-        print("\n🛑 Budget Guard detenido")
-        print(str(error))
+def run_budget_guard(
+    brand_id: int,
+    daily_budget_usd: float,
+) -> None:
+    if DEVELOPMENT_MODE:
         return
 
+    check_daily_budget(
+        brand_id=brand_id,
+        daily_limit=daily_budget_usd,
+    )
+
+
+def execute_provider(runtime_prompt: str) -> dict:
     if DEVELOPMENT_MODE:
         print("🤖 [LLM Runtime] Mode: DEVELOPMENT")
     else:
         print("🤖 [LLM Runtime] Mode: PRODUCTION")
 
-    provider_response = generate_openai_response(
+    return generate_openai_response(
         runtime_prompt=runtime_prompt,
         use_real_api=not DEVELOPMENT_MODE,
     )
 
-    raw_output = provider_response["output"]
-    usage = provider_response["usage"]
-    model_used = provider_response["model_used"]
 
+def validate_provider_output(raw_output: dict) -> InstagramCaptionSchema:
     if FORCE_INVALID_OUTPUT:
         raw_output["hashtags"] = "#esto_deberia_fallar"
 
-    try:
+    return InstagramCaptionSchema(**raw_output)
 
-        validated_output = InstagramCaptionSchema(
-            **raw_output
-        )
 
-    except ValidationError as error:
-
-        execution_time = round(time.time() - start_time, 2)
-
-        log_security_event(
-            brand_id=brand_id,
-            prompt_id=prompt_id,
-            product_data=product_data,
-            runtime_prompt=runtime_prompt,
-            raw_output_received={
-                "error": "invalid_output",
-                "raw_output": raw_output,
-                "validation_error": str(error),
-            },
-            model_used=model_used,
-            execution_time=execution_time,
-            security_flag="invalid_output",
-        )
-
-        print("\n🛑 Invalid Output detenido")
-        print("El output no cumple el schema Pydantic.")
-        print(error)
-
-        return
-
-    execution_time = round(time.time() - start_time, 2)
-
-    cost_usd = calculate_cost(
-        model_name=model_used,
-        input_tokens=usage["input_tokens"],
-        output_tokens=usage["output_tokens"],
-    )
-
+def persist_successful_execution(
+    brand_id: int,
+    prompt_id: int,
+    product_data: dict,
+    runtime_prompt: str,
+    validated_output: InstagramCaptionSchema,
+    model_used: str,
+    execution_time: float,
+    usage: dict,
+    cost_usd: float,
+) -> None:
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -211,10 +132,21 @@ PRODUCT DATA:
     )
 
     conn.commit()
-
     cur.close()
     conn.close()
 
+
+def print_success_summary(
+    brand_name: str,
+    prompt_name: str,
+    version: str,
+    execution_time: float,
+    model_used: str,
+    usage: dict,
+    cost_usd: float,
+    daily_budget_usd: float,
+    validated_output: InstagramCaptionSchema,
+) -> None:
     print("\n✅ Runtime + Sanitizer + Security Flag Layer OK")
 
     print(f"\nBrand: {brand_name}")
@@ -235,11 +167,155 @@ PRODUCT DATA:
     print("Security flag: None")
 
     print("\n--- OUTPUT VALIDADO ---")
-
     print(
         json.dumps(
             validated_output.model_dump(),
             indent=2,
             ensure_ascii=False,
         )
+    )
+
+
+def run_dynamic_runtime(brand_id: int) -> None:
+    start_time = time.time()
+
+    brand, prompt = load_runtime_context(brand_id)
+
+    if not brand:
+        raise ValueError(f"No existe brand_id={brand_id}")
+
+    if not prompt:
+        raise ValueError("No hay prompt activo")
+
+    brand_id, brand_name, brand_config = brand
+    prompt_id, prompt_name, version, system_instruction = prompt
+
+    daily_budget_usd = float(
+        brand_config.get("daily_budget_usd", 1.0)
+    )
+
+    raw_product_data = get_sample_product_data()
+
+    try:
+        product_data = sanitize_product_data(raw_product_data)
+
+    except ValueError as error:
+        execution_time = round(time.time() - start_time, 2)
+
+        log_security_event(
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            product_data=raw_product_data,
+            runtime_prompt="",
+            raw_output_received={
+                "error": "injection_attempt",
+                "message": str(error),
+            },
+            model_used="input_sanitizer",
+            execution_time=execution_time,
+            security_flag="injection_attempt",
+        )
+
+        print("\n🛑 Input Sanitizer detenido")
+        print(str(error))
+        return
+
+    runtime_prompt = assemble_runtime_prompt(
+        system_instruction=system_instruction,
+        brand_config=brand_config,
+        product_data=product_data,
+    )
+
+    try:
+        run_budget_guard(
+            brand_id=brand_id,
+            daily_budget_usd=daily_budget_usd,
+        )
+
+    except RuntimeError as error:
+        execution_time = round(time.time() - start_time, 2)
+
+        log_security_event(
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            product_data=product_data,
+            runtime_prompt=runtime_prompt,
+            raw_output_received={
+                "error": "budget_exceeded",
+                "message": (
+                    "Execution stopped by budget "
+                    "guard before provider call."
+                ),
+            },
+            model_used="budget_guard",
+            execution_time=execution_time,
+            security_flag="budget_exceeded",
+        )
+
+        print("\n🛑 Budget Guard detenido")
+        print(str(error))
+        return
+
+    provider_response = execute_provider(runtime_prompt)
+
+    raw_output = provider_response["output"]
+    usage = provider_response["usage"]
+    model_used = provider_response["model_used"]
+
+    try:
+        validated_output = validate_provider_output(raw_output)
+
+    except ValidationError as error:
+        execution_time = round(time.time() - start_time, 2)
+
+        log_security_event(
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            product_data=product_data,
+            runtime_prompt=runtime_prompt,
+            raw_output_received={
+                "error": "invalid_output",
+                "raw_output": raw_output,
+                "validation_error": str(error),
+            },
+            model_used=model_used,
+            execution_time=execution_time,
+            security_flag="invalid_output",
+        )
+
+        print("\n🛑 Invalid Output detenido")
+        print("El output no cumple el schema Pydantic.")
+        print(error)
+        return
+
+    execution_time = round(time.time() - start_time, 2)
+
+    cost_usd = calculate_cost(
+        model_name=model_used,
+        input_tokens=usage["input_tokens"],
+        output_tokens=usage["output_tokens"],
+    )
+
+    persist_successful_execution(
+        brand_id=brand_id,
+        prompt_id=prompt_id,
+        product_data=product_data,
+        runtime_prompt=runtime_prompt,
+        validated_output=validated_output,
+        model_used=model_used,
+        execution_time=execution_time,
+        usage=usage,
+        cost_usd=cost_usd,
+    )
+
+    print_success_summary(
+        brand_name=brand_name,
+        prompt_name=prompt_name,
+        version=version,
+        execution_time=execution_time,
+        model_used=model_used,
+        usage=usage,
+        cost_usd=cost_usd,
+        daily_budget_usd=daily_budget_usd,
+        validated_output=validated_output,
     )
