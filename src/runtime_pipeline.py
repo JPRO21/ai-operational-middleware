@@ -176,7 +176,10 @@ def print_success_summary(
     )
 
 
-def run_dynamic_runtime(brand_id: int) -> None:
+def run_generation_pipeline(
+    brand_id: int,
+    raw_product_data: dict,
+) -> dict:
     start_time = time.time()
 
     brand, prompt = load_runtime_context(brand_id)
@@ -193,8 +196,6 @@ def run_dynamic_runtime(brand_id: int) -> None:
     daily_budget_usd = float(
         brand_config.get("daily_budget_usd", 1.0)
     )
-
-    raw_product_data = get_sample_product_data()
 
     try:
         product_data = sanitize_product_data(raw_product_data)
@@ -216,9 +217,7 @@ def run_dynamic_runtime(brand_id: int) -> None:
             security_flag="injection_attempt",
         )
 
-        print("\n🛑 Input Sanitizer detenido")
-        print(str(error))
-        return
+        raise
 
     runtime_prompt = assemble_runtime_prompt(
         system_instruction=system_instruction,
@@ -252,9 +251,7 @@ def run_dynamic_runtime(brand_id: int) -> None:
             security_flag="budget_exceeded",
         )
 
-        print("\n🛑 Budget Guard detenido")
-        print(str(error))
-        return
+        raise
 
     provider_response = execute_provider(runtime_prompt)
 
@@ -283,10 +280,7 @@ def run_dynamic_runtime(brand_id: int) -> None:
             security_flag="invalid_output",
         )
 
-        print("\n🛑 Invalid Output detenido")
-        print("El output no cumple el schema Pydantic.")
-        print(error)
-        return
+        raise
 
     execution_time = round(time.time() - start_time, 2)
 
@@ -308,14 +302,40 @@ def run_dynamic_runtime(brand_id: int) -> None:
         cost_usd=cost_usd,
     )
 
-    print_success_summary(
-        brand_name=brand_name,
-        prompt_name=prompt_name,
-        version=version,
-        execution_time=execution_time,
-        model_used=model_used,
-        usage=usage,
-        cost_usd=cost_usd,
-        daily_budget_usd=daily_budget_usd,
-        validated_output=validated_output,
+    return validated_output.model_dump()
+
+
+def run_dynamic_runtime(brand_id: int) -> None:
+    raw_product_data = get_sample_product_data()
+
+    try:
+        output = run_generation_pipeline(
+            brand_id=brand_id,
+            raw_product_data=raw_product_data,
+        )
+
+    except ValueError as error:
+        print("\n🛑 Input Sanitizer detenido")
+        print(str(error))
+        return
+
+    except RuntimeError as error:
+        print("\n🛑 Budget Guard detenido")
+        print(str(error))
+        return
+
+    except ValidationError as error:
+        print("\n🛑 Invalid Output detenido")
+        print("El output no cumple el schema Pydantic.")
+        print(error)
+        return
+
+    print("\n✅ Runtime + Sanitizer + Security Flag Layer OK")
+    print("\n--- OUTPUT VALIDADO ---")
+    print(
+        json.dumps(
+            output,
+            indent=2,
+            ensure_ascii=False,
+        )
     )
