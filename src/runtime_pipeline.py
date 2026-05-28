@@ -5,12 +5,17 @@ from pydantic import ValidationError
 
 from config.database import get_db_connection
 from config.settings import DEVELOPMENT_MODE
-
 from src.database_runtime import (
+    calculate_cost,
+    check_daily_budget,
     load_runtime_context,
     log_security_event,
-    check_daily_budget,
-    calculate_cost,
+)
+from src.intelligence_layer import (
+    brand_protection_check,
+    normalize_input,
+    output_qa_check,
+    semantic_sanity_check,
 )
 from src.openai_client import generate_openai_response
 from src.security import sanitize_input
@@ -136,46 +141,6 @@ def persist_successful_execution(
     conn.close()
 
 
-def print_success_summary(
-    brand_name: str,
-    prompt_name: str,
-    version: str,
-    execution_time: float,
-    model_used: str,
-    usage: dict,
-    cost_usd: float,
-    daily_budget_usd: float,
-    validated_output: InstagramCaptionSchema,
-) -> None:
-    print("\n✅ Runtime + Sanitizer + Security Flag Layer OK")
-
-    print(f"\nBrand: {brand_name}")
-    print(f"Prompt: {prompt_name} {version}")
-    print(f"Tiempo de ejecución: {execution_time}s")
-    print(f"Model used: {model_used}")
-
-    print("\n--- USAGE METADATA ---")
-    print(f"Input tokens: {usage['input_tokens']}")
-    print(f"Output tokens: {usage['output_tokens']}")
-    print(f"Total tokens: {usage['total_tokens']}")
-
-    print("\n--- COST METADATA ---")
-    print(f"Cost USD: ${cost_usd}")
-    print(f"Daily budget limit: ${daily_budget_usd}")
-
-    print("\n--- SECURITY ---")
-    print("Security flag: None")
-
-    print("\n--- OUTPUT VALIDADO ---")
-    print(
-        json.dumps(
-            validated_output.model_dump(),
-            indent=2,
-            ensure_ascii=False,
-        )
-    )
-
-
 def run_generation_pipeline(
     brand_id: int,
     raw_product_data: dict,
@@ -199,6 +164,8 @@ def run_generation_pipeline(
 
     try:
         product_data = sanitize_product_data(raw_product_data)
+        product_data = normalize_input(product_data)
+        semantic_check = semantic_sanity_check(product_data)
 
     except ValueError as error:
         execution_time = round(time.time() - start_time, 2)
@@ -262,6 +229,15 @@ def run_generation_pipeline(
     try:
         validated_output = validate_provider_output(raw_output)
 
+        output_data = validated_output.model_dump()
+
+        brand_check = brand_protection_check(
+            output_data=output_data,
+            brand_config=brand_config,
+        )
+
+        qa_check = output_qa_check(output_data)
+
     except ValidationError as error:
         execution_time = round(time.time() - start_time, 2)
 
@@ -302,7 +278,35 @@ def run_generation_pipeline(
         cost_usd=cost_usd,
     )
 
-    return validated_output.model_dump()
+    final_confidence = min(
+        semantic_check["score"],
+        qa_check["confidence_score"],
+        brand_check["score"],
+    )
+
+    all_issues = (
+        semantic_check["issues"]
+        + brand_check["issues"]
+        + qa_check["issues"]
+    )
+
+    overall_passed = (
+        semantic_check["passed"]
+        and brand_check["passed"]
+        and qa_check["passed"]
+    )
+
+    return {
+        **output_data,
+        "runtime_intelligence": {
+            "semantic_check": semantic_check,
+            "brand_check": brand_check,
+            "qa_check": qa_check,
+            "confidence_score": round(final_confidence, 2),
+            "passed": overall_passed,
+            "issues": all_issues,
+        },
+    }
 
 
 def run_dynamic_runtime(brand_id: int) -> None:

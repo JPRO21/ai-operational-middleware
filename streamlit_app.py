@@ -1,5 +1,5 @@
-import streamlit as st
 import requests
+import streamlit as st
 
 
 st.set_page_config(
@@ -53,6 +53,43 @@ if st.button("Generar contenido"):
 
         st.subheader("CTA")
         st.write(data["cta"])
+
+        runtime_intelligence = data.get(
+            "runtime_intelligence",
+            {},
+        )
+
+        st.divider()
+
+        st.subheader("Runtime Intelligence")
+
+        confidence_score = runtime_intelligence.get(
+            "confidence_score",
+            0,
+        )
+
+        st.metric(
+            "Confidence Score",
+            f"{confidence_score * 100:.0f}%",
+        )
+
+        if runtime_intelligence.get("passed"):
+            st.success("QA Passed")
+        else:
+            st.error("QA Failed")
+
+        issues = runtime_intelligence.get(
+            "issues",
+            [],
+        )
+
+        if issues:
+            st.warning("\n".join(issues))
+        else:
+            st.info("No issues detected")
+
+        with st.expander("Ver runtime intelligence completa"):
+            st.json(runtime_intelligence)
 
     else:
         st.error("Error generando contenido")
