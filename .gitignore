@@ -10,3 +10,4 @@ config/.env
 .env.* 
 __pycache__/
 *.pyc
+start_dev.bat
