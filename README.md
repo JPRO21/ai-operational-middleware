@@ -1,94 +1,281 @@
 # AI Operational Middleware
+
 ![AI Operational Middleware Architecture](docs/architecture-diagram.png)
 
-> Sistema operacional AI-native para automatizar generación de contenido y operaciones de marketing en negocios pequeños.
+> Operational infrastructure for AI-powered content generation workflows.
 
 ## Author
 
-Juan Pablo Rodríguez Salas  
+Juan Pablo Rodríguez Salas
+
 LinkedIn: https://www.linkedin.com/in/juanpablorodriguezs/
-
-## ¿Qué es esto?
-
-Un middleware propio construido en Python que conecta IA generativa con operaciones de negocio reales. No es un wrapper de ChatGPT. Es infraestructura operacional con contexto persistente de marca, orquestación de runtime y observabilidad completa.
-
-La tesis: la IA generativa convertirá el contenido en commodity. La ventaja estará en la **infraestructura** que coordina, valida y escala esa generación de forma consistente.
-
-## Arquitectura
-
-```
-Trigger Layer (n8n / webhook / cron)
-        ↓
-Core Engine (Python · src/main.py)
-  ├── sanitize_input()
-  ├── PromptOps — brand context injection
-  ├── Runtime Orchestration — DEV/PROD bifurcation
-  └── Pydantic validation pipeline
-        ↓
-Provider Layer (src/openai_client.py)
-  ├── OpenAI SDK (real API)
-  ├── Claude API
-  └── Mock provider (safe development)
-        ↓
-Persistence (PostgreSQL)
-  ├── brands — configuración de marca
-  ├── prompts — PromptOps versionado
-  ├── ai_logs — ejecuciones + cost_usd + usage metadata
-  └── feedback_events — gobernanza de outputs
-        ↓
-Delivery Layer (n8n · Google Drive · Notion)
-```
-
-## Lo que ya funciona (Sprint 1A — COMPLETADO)
-
-- [x] Runtime dinámico operativo
-- [x] PostgreSQL conectado (`brands`, `prompts`, `ai_logs`)
-- [x] PromptOps funcional con brand context injection
-- [x] Pydantic validation pipeline
-- [x] DEVELOPMENT_MODE con mock provider seguro
-- [x] Runtime bifurcation DEV/PROD
-- [x] Provider Layer aislada (`src/openai_client.py`)
-- [x] OpenAI SDK integrado
-- [x] Protección contra `mock_key` en producción
-- [x] `ai_logs` persistiendo ejecuciones con `cost_usd`
-
-## En progreso (Sprint 1B)
-
-- [ ] Llamada OpenAI real con structured JSON output
-- [ ] Usage metadata y token accounting
-- [ ] Delivery a Google Drive vía n8n
-
-## Stack
-
-| Capa | Tecnología |
-|---|---|
-| Core Backend | Python 3.11+ |
-| Database | PostgreSQL + pgAdmin |
-| Prompt Ops | PromptOps versionado + JSONB |
-| AI Providers | OpenAI SDK|
-| Trigger / Delivery | n8n |
-| Validation | Pydantic |
-| Storage de outputs | Google Drive · Notion |
-
-## Principio de diseño clave
-
-**Python es el cerebro. n8n es el cable.**
-
-n8n recibe webhooks, dispara ejecuciones y mueve archivos entre servicios. No toma decisiones sobre contenido, no construye prompts, no toca PostgreSQL directamente. Toda la lógica vive en Python.
-
-## ICP (cliente objetivo)
-
-Negocios visuales pequeños con operaciones repetitivas de contenido:
-- Ecommerce lifestyle (plantas, decoración, wellness, cafés boutique)
-- Instagram-heavy retail
-- Hospitality pequeño
-
-Problema que resuelven: catálogo lento, captions inconsistentes, trabajo manual sin estructura.
-
-## Origen
-
-Este proyecto nació de vender contenido con Midjourney. En algún punto entendí que el cuello de botella no era el contenido — era la infraestructura operacional que lo produce. Reconstruí desde esa tesis.
 
 ---
 
-*Spec fundacional v1.3 · Fase 2 — Live Runtime Layer · Mayo 2026*
+# Overview
+
+AI Operational Middleware is a Python-based runtime orchestration system designed to transform raw LLM outputs into controlled, observable and reusable business workflows.
+
+This is not a ChatGPT wrapper.
+
+The project introduces operational layers around AI generation, including:
+
+* Runtime orchestration
+* Brand context injection
+* Security validation
+* Structured output validation
+* Cost monitoring
+* Runtime intelligence
+* Observability and logging
+
+The core thesis behind the project is simple:
+
+> Generative AI will make content a commodity. The competitive advantage will be the infrastructure that coordinates, validates and operates that generation reliably.
+
+---
+
+# Architecture
+
+```text
+Trigger Layer
+(n8n / Webhooks / Cron)
+        ↓
+
+Runtime Interface Layer
+(FastAPI / Streamlit)
+        ↓
+
+Runtime Pipeline
+(runtime_pipeline.py)
+
+  ├── Input Sanitization
+  ├── Prompt Assembly
+  ├── Budget Guard
+  ├── Provider Execution
+  ├── Structured Validation
+  ├── Runtime Intelligence
+  └── Persistence
+
+        ↓
+
+Provider Layer
+
+  ├── OpenAI API
+  ├── Mock Provider
+  └── Future Providers
+
+        ↓
+
+Runtime Intelligence Layer
+
+  ├── Brand Protection
+  ├── Semantic Sanity Check
+  ├── Output QA
+  └── Confidence Scoring
+
+        ↓
+
+Persistence Layer
+
+  ├── brands
+  ├── prompts
+  ├── ai_logs
+  ├── api_pricing
+  └── feedback_events
+```
+
+---
+
+# Current Status
+
+## Project Phase
+
+✅ Runtime as a Service (MVP Complete)
+
+The middleware has evolved from a simple AI runtime into a reusable operational platform capable of serving multiple interfaces and workflows.
+
+---
+
+# Features
+
+## Runtime Orchestration
+
+* Reusable execution pipeline
+* Explicit runtime stages
+* Provider abstraction layer
+* Runtime configuration management
+
+## PromptOps
+
+* Brand-specific context injection
+* Versioned prompts
+* Structured prompt assembly
+
+## Security & Governance
+
+* Input sanitization
+* Prompt injection protection
+* Budget guardrails
+* Invalid output detection
+* Runtime safety checks
+
+## Runtime Intelligence
+
+* Brand protection validation
+* Semantic sanity checks
+* Output QA validation
+* Confidence score generation
+
+## Interfaces
+
+* FastAPI runtime interface
+* OpenAPI / Swagger documentation
+* Streamlit operational dashboard
+
+## Observability
+
+* PostgreSQL persistence
+* Token accounting
+* Cost tracking
+* Execution logs
+* Runtime metadata monitoring
+
+---
+
+# Technology Stack
+
+| Layer          | Technology         |
+| -------------- | ------------------ |
+| Backend        | Python             |
+| API            | FastAPI            |
+| UI             | Streamlit          |
+| Validation     | Pydantic           |
+| Database       | PostgreSQL         |
+| AI Provider    | OpenAI API         |
+| Workflow Layer | n8n                |
+| Observability  | PostgreSQL Logging |
+
+---
+
+# Example Workflow
+
+```text
+Product Data
+      ↓
+Prompt Assembly
+      ↓
+OpenAI Runtime
+      ↓
+Pydantic Validation
+      ↓
+Runtime Intelligence
+      ↓
+Confidence Score
+      ↓
+PostgreSQL Logging
+      ↓
+Delivery Layer
+```
+
+---
+
+# Example Input
+
+```json
+{
+  "brand_id": 1,
+  "name": "Monstera Deliciosa",
+  "details": "Indoor tropical plant"
+}
+```
+
+# Example Output
+
+```json
+{
+  "caption": "Transform your space with the lush beauty of a Monstera Deliciosa...",
+  "hashtags": [
+    "#urbanjungle",
+    "#plantlover",
+    "#indoorplants"
+  ],
+  "cta": "Visit the link in our bio.",
+  "platform": "instagram",
+  "confidence_score": 92
+}
+```
+
+---
+
+# Design Principle
+
+## Python is the brain. Workflows are the transport layer.
+
+Business logic lives in Python.
+
+External systems can trigger executions, move data and distribute outputs, but operational decisions remain inside the middleware.
+
+---
+
+# Why This Project Exists
+
+This project was built to explore and demonstrate:
+
+* AI Operations
+* Workflow Automation
+* Runtime Engineering
+* Operational Intelligence
+* AI Observability
+* Validation Pipelines
+* Production-oriented AI Systems
+
+The goal is to understand how AI systems can be operated reliably beyond simple API calls.
+
+---
+
+# Roadmap
+
+## Version 1.0
+
+✅ Runtime orchestration
+
+✅ FastAPI interface
+
+✅ Streamlit dashboard
+
+✅ Runtime intelligence
+
+✅ Observability
+
+✅ Cost monitoring
+
+✅ Structured validation
+
+## Future Exploration
+
+* Few-shot retrieval
+* n8n delivery adapters
+* Image generation workflows
+* AI Content Engine built on top of the middleware
+
+---
+
+# Demonstrated Capabilities
+
+The current MVP demonstrates:
+
+- Runtime orchestration through a reusable generation pipeline
+- FastAPI service layer exposing AI workflows through REST endpoints
+- Streamlit operational dashboard for testing and validation
+- Structured output validation using Pydantic
+- Runtime Intelligence Layer for QA, semantic checks and confidence scoring
+- PostgreSQL persistence for observability, logging and cost tracking
+---
+
+Version 1.0 — Runtime as a Service MVP
+
+Built by Juan Pablo Rodríguez Salas
+GitHub: https://github.com/JPRO21
+LinkedIn: https://www.linkedin.com/in/juanpablorodriguezs/
+
+
