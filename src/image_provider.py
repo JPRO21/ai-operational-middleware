@@ -1,4 +1,7 @@
+import os
 from abc import ABC, abstractmethod
+
+import fal_client
 
 
 class ImageProvider(ABC):
@@ -43,3 +46,34 @@ def build_image_prompt(profile: dict, producto: str, objective: str) -> str:
 class MockImageProvider(ImageProvider):
     def generate(self, prompt: str) -> str:
         return "https://example.com/mock-instagram-image-1080x1350.jpg"
+
+
+class FalImageProvider(ImageProvider):
+    def __init__(self, model: str = "fal-ai/flux/dev"):
+        self.model = model
+
+    def generate(self, prompt: str) -> str:
+        if not os.getenv("FAL_KEY"):
+            raise RuntimeError("FAL_KEY environment variable is not configured.")
+
+        result = fal_client.subscribe(
+            self.model,
+            arguments={
+                "prompt": prompt,
+                "image_size": {
+                    "width": 1080,
+                    "height": 1350,
+                },
+                "num_images": 1,
+            },
+        )
+
+        images = result.get("images", [])
+        if not images:
+            raise RuntimeError("Fal.ai did not return any images.")
+
+        image_url = images[0].get("url")
+        if not image_url:
+            raise RuntimeError("Fal.ai image response did not include a URL.")
+
+        return image_url
