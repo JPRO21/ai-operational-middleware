@@ -1,7 +1,7 @@
-
 import requests
 import streamlit as st
 
+from src.ice_prompt_builder import build_prompt
 from src.ice_repository import (
     create_business_profile,
     get_business_profiles,
@@ -29,7 +29,7 @@ app_mode = st.sidebar.selectbox(
 if app_mode == "Instagram Content Engine":
 
     st.header("Instagram Content Engine")
-    st.caption("Sprint 0 — T-02 Business Objective")
+    st.caption("Sprint 0 — T-03 Prompt Builder Preview")
 
     st.subheader("Crear perfil de negocio")
 
@@ -53,17 +53,13 @@ if app_mode == "Instagram Content Engine":
             placeholder="Ej: Santiago",
         )
 
-        submitted = st.form_submit_button(
-            "Guardar perfil"
-        )
+        submitted = st.form_submit_button("Guardar perfil")
 
     if submitted:
 
         if not nombre_negocio or not rubro or not ciudad:
 
-            st.error(
-                "Completa nombre del negocio, rubro y ciudad."
-            )
+            st.error("Completa nombre del negocio, rubro y ciudad.")
 
         else:
 
@@ -73,9 +69,7 @@ if app_mode == "Instagram Content Engine":
                 ciudad=ciudad,
             )
 
-            st.success(
-                f"Perfil creado correctamente. ID: {profile_id}"
-            )
+            st.success(f"Perfil creado correctamente. ID: {profile_id}")
 
     st.divider()
 
@@ -88,10 +82,11 @@ if app_mode == "Instagram Content Engine":
         selected_profile = st.selectbox(
             "Selecciona un negocio",
             profiles,
-            format_func=lambda profile:
+            format_func=lambda profile: (
                 f"{profile['nombre_negocio']} — "
                 f"{profile['rubro']} — "
-                f"{profile['ciudad']}",
+                f"{profile['ciudad']}"
+            ),
         )
 
         objective = st.selectbox(
@@ -104,9 +99,39 @@ if app_mode == "Instagram Content Engine":
             ],
         )
 
-        st.info(
-            f"Objetivo seleccionado: {objective}"
+        st.info(f"Objetivo seleccionado: {objective}")
+
+        producto = st.text_input(
+            "Producto",
+            placeholder="Ej: Cappuccino artesanal",
         )
+
+        oferta = st.text_input(
+            "Oferta (opcional)",
+            placeholder="Ej: 2x1 hasta las 18:00",
+        )
+
+        if st.button("Construir prompt"):
+
+            if not producto:
+
+                st.error("Completa el producto antes de construir el prompt.")
+
+            else:
+
+                prompt = build_prompt(
+                    profile=selected_profile,
+                    producto=producto,
+                    oferta=oferta,
+                    objective=objective,
+                )
+
+                st.subheader("Prompt generado")
+
+                st.code(
+                    prompt,
+                    language="text",
+                )
 
         st.divider()
 
@@ -123,9 +148,7 @@ if app_mode == "Instagram Content Engine":
 
     else:
 
-        st.info(
-            "Aún no hay perfiles guardados."
-        )
+        st.info("Aún no hay perfiles guardados.")
 
 # =====================================================
 # MIDDLEWARE DEMO
@@ -147,10 +170,7 @@ else:
 
     product_details = st.text_area(
         "Detalles",
-        placeholder=(
-            "Ej: Planta tropical de hojas "
-            "grandes decorativas"
-        ),
+        placeholder="Ej: Planta tropical de hojas grandes decorativas",
     )
 
     if st.button("Generar contenido"):
@@ -161,9 +181,7 @@ else:
             "details": product_details,
         }
 
-        with st.spinner(
-            "Generando contenido..."
-        ):
+        with st.spinner("Generando contenido..."):
 
             response = requests.post(
                 "http://127.0.0.1:8000/generate",
@@ -174,17 +192,13 @@ else:
 
             data = response.json()
 
-            st.success(
-                "Contenido generado"
-            )
+            st.success("Contenido generado")
 
             st.subheader("Caption")
             st.write(data["caption"])
 
             st.subheader("Hashtags")
-            st.write(
-                " ".join(data["hashtags"])
-            )
+            st.write(" ".join(data["hashtags"]))
 
             st.subheader("CTA")
             st.write(data["cta"])
@@ -196,15 +210,11 @@ else:
 
             st.divider()
 
-            st.subheader(
-                "Runtime Intelligence"
-            )
+            st.subheader("Runtime Intelligence")
 
-            confidence_score = (
-                runtime_intelligence.get(
-                    "confidence_score",
-                    0,
-                )
+            confidence_score = runtime_intelligence.get(
+                "confidence_score",
+                0,
             )
 
             st.metric(
@@ -212,39 +222,24 @@ else:
                 f"{confidence_score * 100:.0f}%",
             )
 
-            if runtime_intelligence.get(
-                "passed"
-            ):
+            if runtime_intelligence.get("passed"):
                 st.success("QA Passed")
             else:
                 st.error("QA Failed")
 
-            issues = (
-                runtime_intelligence.get(
-                    "issues",
-                    [],
-                )
+            issues = runtime_intelligence.get(
+                "issues",
+                [],
             )
 
             if issues:
-                st.warning(
-                    "\n".join(issues)
-                )
+                st.warning("\n".join(issues))
             else:
-                st.info(
-                    "No issues detected"
-                )
+                st.info("No issues detected")
 
-            with st.expander(
-                "Ver runtime intelligence completa"
-            ):
-                st.json(
-                    runtime_intelligence
-                )
+            with st.expander("Ver runtime intelligence completa"):
+                st.json(runtime_intelligence)
 
         else:
 
-            st.error(
-                "Error generando contenido"
-            )
-
+            st.error("Error generando contenido")
