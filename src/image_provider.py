@@ -49,7 +49,7 @@ class MockImageProvider(ImageProvider):
 
 
 class FalImageProvider(ImageProvider):
-    def __init__(self, model: str = "fal-ai/flux/dev"):
+    def __init__(self, model: str = "fal-ai/fast-sdxl"):
         self.model = model
 
     def generate(self, prompt: str) -> str:
@@ -60,10 +60,7 @@ class FalImageProvider(ImageProvider):
             self.model,
             arguments={
                 "prompt": prompt,
-                "image_size": {
-                    "width": 1080,
-                    "height": 1350,
-                },
+                "image_size": "portrait_4_3",
                 "num_images": 1,
             },
         )
