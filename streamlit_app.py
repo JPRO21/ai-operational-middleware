@@ -1,7 +1,7 @@
+
 import requests
 import streamlit as st
 
-from src.ice_prompt_builder import build_prompt
 from src.ice_repository import (
     create_business_profile,
     get_business_profiles,
@@ -29,7 +29,7 @@ app_mode = st.sidebar.selectbox(
 if app_mode == "Instagram Content Engine":
 
     st.header("Instagram Content Engine")
-    st.caption("Sprint 0 — T-03 Prompt Builder Preview")
+    st.caption("Sprint 0 — Progressive UI")
 
     st.subheader("Crear perfil de negocio")
 
@@ -99,8 +99,6 @@ if app_mode == "Instagram Content Engine":
             ],
         )
 
-        st.info(f"Objetivo seleccionado: {objective}")
-
         producto = st.text_input(
             "Producto",
             placeholder="Ej: Cappuccino artesanal",
@@ -111,27 +109,77 @@ if app_mode == "Instagram Content Engine":
             placeholder="Ej: 2x1 hasta las 18:00",
         )
 
-        if st.button("Construir prompt"):
+        if st.button("Generar contenido ICE"):
 
             if not producto:
 
-                st.error("Completa el producto antes de construir el prompt.")
+                st.error("Completa el producto antes de generar contenido.")
 
             else:
 
-                prompt = build_prompt(
-                    profile=selected_profile,
-                    producto=producto,
-                    oferta=oferta,
-                    objective=objective,
-                )
+                payload = {
+                    "profile": {
+                        "nombre_negocio": selected_profile["nombre_negocio"],
+                        "rubro": selected_profile["rubro"],
+                        "ciudad": selected_profile["ciudad"],
+                    },
+                    "producto": producto,
+                    "oferta": oferta,
+                    "objective": objective,
+                }
 
-                st.subheader("Prompt generado")
+                with st.spinner("Generando texto..."):
 
-                st.code(
-                    prompt,
-                    language="text",
-                )
+                    text_response = requests.post(
+                        "http://127.0.0.1:8000/generate/text",
+                        json=payload,
+                        timeout=60,
+                    )
+
+                if text_response.status_code != 200:
+
+                    st.error("Error generando texto.")
+                    st.write(text_response.text)
+
+                else:
+
+                    text_result = text_response.json()
+
+                    st.success("Texto generado")
+
+                    st.subheader("Caption")
+                    st.write(text_result["caption"])
+
+                    st.subheader("Hashtags")
+                    st.write(" ".join(text_result["hashtags"]))
+
+                    st.subheader("CTA")
+                    st.write(text_result["cta"])
+
+                    image_placeholder = st.empty()
+                    image_placeholder.info("⏳ Generando imagen...")
+
+                    image_response = requests.post(
+                        "http://127.0.0.1:8000/generate/image",
+                        json=payload,
+                        timeout=120,
+                    )
+
+                    if image_response.status_code != 200:
+
+                        image_placeholder.error(
+                            "Error generando imagen."
+                        )
+                        st.write(image_response.text)
+
+                    else:
+
+                        image_result = image_response.json()
+
+                        image_placeholder.image(
+                            image_result["url"],
+                            width="stretch"
+                        )
 
         st.divider()
 
@@ -202,43 +250,6 @@ else:
 
             st.subheader("CTA")
             st.write(data["cta"])
-
-            runtime_intelligence = data.get(
-                "runtime_intelligence",
-                {},
-            )
-
-            st.divider()
-
-            st.subheader("Runtime Intelligence")
-
-            confidence_score = runtime_intelligence.get(
-                "confidence_score",
-                0,
-            )
-
-            st.metric(
-                "Confidence Score",
-                f"{confidence_score * 100:.0f}%",
-            )
-
-            if runtime_intelligence.get("passed"):
-                st.success("QA Passed")
-            else:
-                st.error("QA Failed")
-
-            issues = runtime_intelligence.get(
-                "issues",
-                [],
-            )
-
-            if issues:
-                st.warning("\n".join(issues))
-            else:
-                st.info("No issues detected")
-
-            with st.expander("Ver runtime intelligence completa"):
-                st.json(runtime_intelligence)
 
         else:
 
